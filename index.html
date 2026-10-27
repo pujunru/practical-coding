@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/pyodide/; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://raw.githubusercontent.com https://cdn.jsdelivr.net/pyodide/; worker-src 'self' https://cdn.jsdelivr.net/pyodide/; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Practical Coding</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/codemirror/codemirror.js" defer></script>
+  <script src="vendor/codemirror/python.js" defer></script>
+  <script src="vendor/codemirror/matchbrackets.js" defer></script>
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <img src="favicon.svg" alt="" width="20" height="20">
+      <span>Practical Coding</span>
+    </a>
+    <div id="toolbar" class="toolbar"></div>
+  </header>
+  <main id="app"></main>
+  <noscript>This site needs JavaScript to run Python in your browser.</noscript>
+</body>
+</html>
