@@ -642,7 +642,8 @@ async function showProblem(id, requestedLevel) {
 
     const firstFail = report.cases.findIndex((c) => !c.passed);
     if (report.ok) {
-      store.set(`passed:${id}:${level}`, "1");
+      // Submit judges this level and every earlier one, so all of them passed.
+      for (let n = 1; n <= level; n++) store.set(`passed:${id}:${n}`, "1");
       if (levels.every((_, i) => isLevelPassed(id, i + 1))) store.set(`solved:${id}`, "1");
       updateBadges();
     }
