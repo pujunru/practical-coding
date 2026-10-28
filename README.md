@@ -12,6 +12,10 @@ LRU cache, a key-value store — in Python, right in the browser.
   (⌘/Ctrl + ') tries your editable testcases; **Submit** (⌘/Ctrl + Enter) judges
   the current level and every level before it, showing input, output and
   expected output.
+- System design: **Fundamentals** (a concept map with drills for every concept:
+  multiple choice, ordering, estimates, recall) and **Design questions**
+  (a timed, step-by-step answer workspace with a reference outline and a
+  self-check rubric).
 - Python runs locally in your browser through [Pyodide](https://pyodide.org)
   (WebAssembly). Your code never leaves your machine.
 - No server, no account, no build step. Drafts and solved status are kept in
@@ -38,7 +42,11 @@ the bank configured in [`config.js`](config.js).
 
 | Path | What |
 | --- | --- |
-| `index.html`, `app.js`, `styles.css` | the whole UI: a hash router with a list view and a problem view |
+| `index.html`, `app.js` | page shell and hash router |
+| `lib.js` | shared helpers: bank fetching, storage, DOM, Markdown, panes |
+| `coding.js` | coding problem list and problem page |
+| `sd.js` | system design fundamentals and design questions |
+| `styles.css` | all styles |
 | `config.js` | problem bank URL and run timeout |
 | `runner/worker.js` | Web Worker that loads Pyodide and runs code |
 | `runner/harness.py` | test harness, plain CPython; the bank's CI uses it too |
