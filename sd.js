@@ -451,7 +451,7 @@ export async function showQuestion(id) {
   const start = () => { ticking = setInterval(() => { elapsed++; if (elapsed % 5 === 0) saveQuestion(id, { elapsed }); drawClock(); }, 1000); drawClock(); };
   const pause = () => { clearInterval(ticking); ticking = null; saveQuestion(id, { elapsed }); drawClock(); };
   drawClock();
-  const revealButton = h("button", { class: "submit", type: "button", onclick: () => reveal() }, "Reveal reference");
+  const revealButton = h("button", { class: "submit", type: "button", onclick: () => reveal() }, "Reveal", h("span", { class: "wide-only" }, " reference"));
 
   fill(toolbar,
     h("a", { class: "back", href: "#/sd/questions" }, "← Questions"),
@@ -473,7 +473,7 @@ export async function showQuestion(id) {
       saveQuestion(id, { revealed: true, ticks: [] });
       state = questionState(id);
     }
-    revealButton.textContent = "Reference shown";
+    fill(revealButton, "Revealed");
     revealButton.disabled = true;
     drawReference();
     drawChecklist();

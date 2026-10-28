@@ -671,6 +671,13 @@ textarea.answer {
 
 @media (max-width: 800px) {
   .topbar:has(.toolbar:not(:empty)) .nav { display: none; }
+  .topbar { gap: 10px; padding: 0 10px; }
+  .toolbar { gap: 6px; }
+  .toolbar .actions { gap: 4px; }
+  .toolbar button.run, .toolbar button.submit { padding: 6px 10px; }
+  .back { white-space: nowrap; font-size: 13px; }
+  .clock { min-width: 0; padding: 0 2px; }
+  .wide-only { display: none; }
   .nav a { padding: 5px 6px; }
   .concept-grid { grid-template-columns: minmax(0, 1fr); }
   .answer-body { min-height: 60vh; }
