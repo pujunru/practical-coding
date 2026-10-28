@@ -499,8 +499,11 @@ button.next { margin-bottom: 12px; }
 .lede { margin: -6px 0 16px; }
 .question-section { margin-top: 24px; }
 .question-section h2 { font-size: 15px; margin: 0 0 10px; }
+.question-section .problems { table-layout: fixed; }
+.question-section .problems td.status { width: 32px; }
 .problems td.score { width: 48px; text-align: right; }
 .problems td.diff { width: 80px; }
+.question-section .problems td.tags { width: 38%; }
 .notes {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -580,5 +583,5 @@ textarea.answer {
   .wide-only { display: none; }
   .nav a { padding: 5px 6px; }
   .answer-body { min-height: 60vh; }
-  .problems td.tags { display: none; }
+  .problems td.tags, .question-section .problems td.tags { display: none; }
 }
