@@ -1,23 +1,15 @@
-// System design: fundamentals guides and design-question workspaces.
+// System design: design-question list and workspace.
 import {
   ID_RE, app, toolbar, fetchText, store, h, fill, renderMarkdown, difficulty,
   pane, layout, makeDivider, errorBox, showNotFound, currentRoute,
 } from "./lib.js";
 
-const F_ROOT = "system-design/fundamentals/";
 const Q_ROOT = "system-design/questions/";
 
 const loadJson = async (path) => JSON.parse(await fetchText(path));
-const loadFundamentals = () => loadJson(`${F_ROOT}index.json`);
 const loadQuestions = () => loadJson(`${Q_ROOT}index.json`);
 
 // ---------------------------------------------------------------- progress
-
-// Per concept: {"<drill index>": "ok" | "bad"}.
-const drillState = (id) => { try { return JSON.parse(store.get(`sdf:${id}`)) || {}; } catch { return {}; } };
-const saveDrill = (id, i, result) => store.set(`sdf:${id}`, JSON.stringify({ ...drillState(id), [i]: result }));
-const conceptScore = (id) => Object.values(drillState(id)).filter((v) => v === "ok").length;
-const conceptMistakes = (id) => Object.values(drillState(id)).filter((v) => v === "bad").length;
 
 // Per question: {answers: {step: text}, ticks: [bool], revealed, best, elapsed}.
 const questionState = (id) => { try { return JSON.parse(store.get(`sdq:${id}`)) || {}; } catch { return {}; } };
@@ -28,186 +20,6 @@ const md = (text, cls = "markdown") => {
   el.innerHTML = renderMarkdown(text || "");
   return el;
 };
-
-const bar = (value, total) => h("span", { class: "bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(total), "aria-valuenow": String(value) },
-  h("span", { style: `width:${total ? (100 * value) / total : 0}%` }));
-
-// ---------------------------------------------------------------- fundamentals map
-
-export async function showFundamentals() {
-  document.title = "Fundamentals · Practical Coding";
-  toolbar.replaceChildren();
-  app.className = "list-view";
-  fill(app, h("p", { class: "muted" }, "Loading fundamentals…"));
-  let index;
-  try {
-    index = await loadFundamentals();
-  } catch (err) {
-    fill(app, errorBox(err));
-    return;
-  }
-
-  const concepts = index.categories.flatMap((c) => c.concepts);
-  const total = concepts.reduce((n, c) => n + c.prompts, 0);
-  const correct = concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.prompts), 0);
-  const mistakes = concepts.filter((c) => conceptMistakes(c.id)).length;
-  const search = h("input", { type: "search", placeholder: "Search concepts", "aria-label": "Search concepts" });
-  const sections = h("div", { class: "concept-sections" });
-
-  const render = () => {
-    const q = search.value.trim().toLowerCase();
-    const shownSections = index.categories.map((cat) => {
-      const shown = cat.concepts.filter((c) => !q || c.title.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q));
-      if (!shown.length) return null;
-      const done = cat.concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.prompts), 0);
-      const all = cat.concepts.reduce((n, c) => n + c.prompts, 0);
-      return h("section", { class: "concept-section" },
-        h("div", { class: "section-head" }, h("h2", {}, cat.title), h("span", { class: "muted small" }, `${done} / ${all}`)),
-        conceptTable(shown.map((c) => {
-          const score = Math.min(conceptScore(c.id), c.prompts);
-          return conceptRow(c.id, c.title, score === c.prompts && score > 0,
-            h("span", { class: "concept-meta" }, bar(score, c.prompts), h("span", { class: "muted small" }, `${score}/${c.prompts}`)));
-        })),
-      );
-    }).filter(Boolean);
-    fill(sections, shownSections.length ? shownSections : h("p", { class: "muted" }, "No concepts match."));
-  };
-  search.addEventListener("input", render);
-  render();
-
-  fill(app,
-    h("div", { class: "list-head" },
-      h("h1", {}, "Fundamentals"),
-      h("span", { class: "muted" }, `${correct} / ${total} prompts explained`),
-      h("span", { class: "spacer" }),
-      mistakes ? h("a", { class: "pill-link", href: "#/sd/review" }, `Go again (${mistakes})`) : null,
-    ),
-    h("p", { class: "muted lede" }, "Each concept is a short guide: how to explain it, the model to draw, the details interviewers probe, and prompts to answer out loud."),
-    search,
-    sections,
-  );
-}
-
-// Concepts are listed in rows like the coding problem list, not as cards.
-const conceptTable = (rows) => h("table", { class: "problems concepts" }, h("tbody", {}, rows));
-const conceptRow = (id, title, done, meta) =>
-  h("tr", { onclick: (e) => { if (e.target.tagName !== "A") location.hash = `#/sd/f/${id}`; } },
-    h("td", { class: "status" }, done ? h("span", { class: "check", title: "All prompts explained" }, "✓") : ""),
-    h("td", {}, h("a", { href: `#/sd/f/${id}` }, title)),
-    h("td", { class: "progress" }, meta));
-
-export async function showReview() {
-  document.title = "Review · Practical Coding";
-  toolbar.replaceChildren();
-  app.className = "list-view";
-  let index;
-  try {
-    index = await loadFundamentals();
-  } catch (err) {
-    fill(app, errorBox(err));
-    return;
-  }
-  const missed = index.categories.flatMap((cat) => cat.concepts.map((c) => ({ ...c, cat: cat.title }))).filter((c) => conceptMistakes(c.id));
-  fill(app,
-    h("p", {}, h("a", { class: "back", href: "#/sd/fundamentals" }, "← Fundamentals")),
-    h("h1", {}, "Go again"),
-    missed.length
-      ? conceptTable(missed.map((c) => conceptRow(c.id, c.title, false,
-        h("span", { class: "muted small" }, `${c.cat} · ${conceptMistakes(c.id)} to retry`))))
-      : h("p", { class: "muted" }, "Nothing to retry — every prompt you answered covered all its key points."),
-  );
-}
-
-// ---------------------------------------------------------------- concept page
-
-// A concept is a guide, not a quiz: how to explain it, the model to draw,
-// the details interviewers probe, and prompts to answer out loud. Progress is
-// self-assessed: a prompt counts once every key point was covered.
-export async function showConcept(id) {
-  if (!ID_RE.test(id)) return showNotFound();
-  toolbar.replaceChildren();
-  app.className = "list-view";
-  fill(app, h("p", { class: "muted" }, "Loading…"));
-  let index, concept;
-  try {
-    index = await loadFundamentals();
-    concept = await loadJson(`${F_ROOT}${id}.json`);
-  } catch (err) {
-    fill(app, errorBox(err));
-    return;
-  }
-  if (currentRoute() !== `sd/f/${id}`) return;
-  const order = index.categories.flatMap((cat) => cat.concepts.map((c) => ({ ...c, cat: cat.title })));
-  const at = order.findIndex((c) => c.id === id);
-  const cat = order[at]?.cat || "";
-  const prev = order[at - 1];
-  const next = order[at + 1];
-  const prompts = concept.prompts || [];
-  document.title = `${concept.title} · Fundamentals`;
-
-  const score = h("span", { class: "muted" });
-  const updateScore = () => { score.textContent = `${Math.min(conceptScore(id), prompts.length)} / ${prompts.length} explained`; };
-  updateScore();
-
-  const details = (concept.details || []).map((d) => h("details", { class: "probe" }, h("summary", {}, md(d.q, "markdown inline")), md(d.a)));
-  const toggleAll = h("button", { class: "link", type: "button", onclick: () => {
-    const open = !details.every((d) => d.open);
-    details.forEach((d) => { d.open = open; });
-    toggleAll.textContent = open ? "Hide all answers" : "Show all answers";
-  } }, "Show all answers");
-
-  fill(app,
-    h("p", { class: "crumbs" }, h("a", { href: "#/sd/fundamentals" }, "Fundamentals"), h("span", { class: "muted" }, ` / ${cat}`)),
-    h("div", { class: "list-head" }, h("h1", {}, concept.title), score, h("span", { class: "spacer" }),
-      h("button", { class: "link", type: "button", onclick: () => { store.remove(`sdf:${id}`); showConcept(id); } }, "Reset")),
-    h("section", { class: "guide-block explain" }, h("h2", {}, "How to explain it"), md(concept.explain)),
-    h("section", { class: "guide-block" }, h("h2", {}, "The model"), md(concept.model)),
-    details.length ? h("section", { class: "guide-block" },
-      h("div", { class: "section-head" }, h("h2", {}, "Details interviewers probe"), h("span", { class: "spacer" }), toggleAll),
-      h("p", { class: "muted small" }, "Answer each one in your head, then open it."),
-      h("div", { class: "probes" }, details)) : null,
-    prompts.length ? h("section", { class: "guide-block" },
-      h("h2", {}, "Say it out loud"),
-      h("p", { class: "muted small" }, "Answer as you would in the interview, then reveal the key points and tick the ones you covered."),
-      h("div", { class: "drills" }, prompts.map((p, i) => promptCard(id, p, i, updateScore)))) : null,
-    h("nav", { class: "pager" },
-      prev ? h("a", { href: `#/sd/f/${prev.id}` }, `← ${prev.title}`) : h("span"),
-      next ? h("a", { href: `#/sd/f/${next.id}` }, `${next.title} →`) : h("span")),
-  );
-}
-
-function promptCard(conceptId, prompt, i, onResult) {
-  const previous = drillState(conceptId)[i];
-  const notes = h("textarea", { rows: 3, class: "recall-input", placeholder: "Optional: jot down your answer first.", "aria-label": "Your answer" });
-  const reveal = h("div", { class: "feedback" });
-  const card = h("article", { class: `drill${previous ? ` is-${previous}` : ""}` },
-    h("div", { class: "drill-head" },
-      h("span", { class: "drill-n" }, `Prompt ${i + 1}`),
-      previous ? h("span", { class: `drill-prev ${previous}` }, previous === "ok" ? "✓ explained" : "↺ go again") : null),
-    md(prompt.q, "markdown drill-q"),
-    notes,
-    h("button", { type: "button", class: "run small-button", onclick: () => showPoints() }, "Reveal key points"),
-    reveal);
-  function showPoints() {
-    const boxes = prompt.points.map(() => h("input", { type: "checkbox" }));
-    const done = h("button", { type: "button", class: "submit small-button", onclick: () => {
-      const covered = boxes.filter((b) => b.checked).length;
-      const ok = covered === boxes.length;
-      saveDrill(conceptId, i, ok ? "ok" : "bad");
-      card.classList.toggle("is-ok", ok);
-      card.classList.toggle("is-bad", !ok);
-      result.textContent = ok ? "All key points covered." : `${covered} of ${boxes.length} covered — try it again later.`;
-      result.className = `small ${ok ? "good" : "bad"}`;
-      onResult();
-    } }, "Done");
-    const result = h("span", { class: "small" });
-    fill(reveal,
-      h("div", { class: "label" }, "Key points"),
-      h("ul", { class: "rubric" }, prompt.points.map((pt, k) => h("li", {}, h("label", {}, boxes[k], md(pt, "markdown inline"))))),
-      h("div", { class: "self-grade" }, done, result));
-  }
-  return card;
-}
 
 // ---------------------------------------------------------------- questions list
 
@@ -414,8 +226,6 @@ export async function showQuestion(id) {
       h("p", { class: "muted small" }, "One good answer, not the only one. The section for the step you are on is open."),
       STEPS.filter(([key]) => q.reference?.[key]).map(([key, title]) => h("details", { class: "ref-step", open: key === s[0] },
         h("summary", {}, title), md(q.reference[key]))),
-      q.concepts?.length ? h("div", { class: "concept-links" }, h("div", { class: "label" }, "Fundamentals this question uses"),
-        q.concepts.map((c) => h("a", { class: "tag", href: `#/sd/f/${c}` }, c.replace(/-/g, " ")))) : null,
     );
   }
   function drawChecklist() {

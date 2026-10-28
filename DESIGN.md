@@ -21,25 +21,20 @@ account, no build step and no AI.
 
 ## System design
 
-Two modules read from `system-design/` in the bank.
+Design questions are read from `system-design/questions/` in the bank.
 
-- **Fundamentals** (`#/sd/fundamentals`, `#/sd/f/<concept>`): a map of
-  categories and concepts with per-concept progress. A concept page shows a
-  collapsible mental model and 4–6 drills. Choice, order and number drills are
-  checked on the spot; recall drills reveal a reference and the user marks
-  themselves. Results live in `localStorage` (`pc:sdf:<concept>`), and
-  `#/sd/review` lists concepts with drills to redo. Options and items are
-  shuffled with a seed per drill, so the layout is stable between visits.
-- **Design questions** (`#/sd/questions`, `#/sd/q/<id>`): the coding page's
-  three panes, reused. Left: prompt and, after reveal, a reference outline per
-  step. Top right: one text area per interview step (requirements, estimation,
-  API, data model, high-level design, deep dives, wrap-up). Bottom right: a
-  self-check rubric. A timer runs in the top bar. Revealing the reference
-  pauses the timer; rubric items whose keywords appear in the answer are
-  flagged "mentioned", but only the user's ticks count toward the score.
+- **List** (`#/sd/questions`): questions grouped by category with difficulty,
+  companies and your best self-check score.
+- **Workspace** (`#/sd/q/<id>`): the coding page's three panes, reused. Left:
+  prompt and, after reveal, a reference outline per step. Top right: one text
+  area per interview step (requirements, estimation, API, data model,
+  high-level design, deep dives, wrap-up). Bottom right: a self-check rubric.
+  A timer runs in the top bar. Revealing the reference pauses the timer;
+  rubric items whose keywords appear in the answer are flagged "mentioned",
+  but only the user's ticks count toward the score.
 
-No AI grades anything: auto-checking is limited to drills with a single right
-answer, and open-ended answers are compared against a reference by the user.
+No AI grades anything: open-ended answers are compared against a reference by
+the user.
 
 ## Non-goals
 
