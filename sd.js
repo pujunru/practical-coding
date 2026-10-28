@@ -37,7 +37,7 @@ const bar = (value, total) => h("span", { class: "bar", role: "progressbar", "ar
 export async function showFundamentals() {
   document.title = "Fundamentals · Practical Coding";
   toolbar.replaceChildren();
-  app.className = "list-view wide";
+  app.className = "list-view";
   fill(app, h("p", { class: "muted" }, "Loading fundamentals…"));
   let index;
   try {
@@ -63,10 +63,9 @@ export async function showFundamentals() {
       const all = cat.concepts.reduce((n, c) => n + c.prompts, 0);
       return h("section", { class: "concept-section" },
         h("div", { class: "section-head" }, h("h2", {}, cat.title), h("span", { class: "muted small" }, `${done} / ${all}`)),
-        h("div", { class: "concept-grid" }, shown.map((c) => {
+        conceptTable(shown.map((c) => {
           const score = Math.min(conceptScore(c.id), c.prompts);
-          return h("a", { class: `concept-card${score === c.prompts ? " done" : ""}`, href: `#/sd/f/${c.id}` },
-            h("span", { class: "concept-title" }, c.title),
+          return conceptRow(c.id, c.title, score === c.prompts && score > 0,
             h("span", { class: "concept-meta" }, bar(score, c.prompts), h("span", { class: "muted small" }, `${score}/${c.prompts}`)));
         })),
       );
@@ -89,6 +88,14 @@ export async function showFundamentals() {
   );
 }
 
+// Concepts are listed in rows like the coding problem list, not as cards.
+const conceptTable = (rows) => h("table", { class: "problems concepts" }, h("tbody", {}, rows));
+const conceptRow = (id, title, done, meta) =>
+  h("tr", { onclick: (e) => { if (e.target.tagName !== "A") location.hash = `#/sd/f/${id}`; } },
+    h("td", { class: "status" }, done ? h("span", { class: "check", title: "All prompts explained" }, "✓") : ""),
+    h("td", {}, h("a", { href: `#/sd/f/${id}` }, title)),
+    h("td", { class: "progress" }, meta));
+
 export async function showReview() {
   document.title = "Review · Practical Coding";
   toolbar.replaceChildren();
@@ -105,8 +112,7 @@ export async function showReview() {
     h("p", {}, h("a", { class: "back", href: "#/sd/fundamentals" }, "← Fundamentals")),
     h("h1", {}, "Go again"),
     missed.length
-      ? h("div", { class: "concept-grid" }, missed.map((c) => h("a", { class: "concept-card", href: `#/sd/f/${c.id}` },
-        h("span", { class: "concept-title" }, c.title),
+      ? conceptTable(missed.map((c) => conceptRow(c.id, c.title, false,
         h("span", { class: "muted small" }, `${c.cat} · ${conceptMistakes(c.id)} to retry`))))
       : h("p", { class: "muted" }, "Nothing to retry — every prompt you answered covered all its key points."),
   );
