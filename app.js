@@ -475,8 +475,8 @@ async function showProblem(id, requestedLevel) {
   }
 
   fill(levelTabs, levels.map((l, i) => h("button", {
-    class: "level-tab", type: "button", role: "tab", onclick: () => selectLevel(i + 1),
-  }, h("span", { class: "level-check", "aria-hidden": "true" }, "✓"), `Level ${i + 1}`, h("span", { class: "level-name" }, ` · ${l.title}`))));
+    class: "level-tab", type: "button", role: "tab", title: `Level ${i + 1} · ${l.title}`, onclick: () => selectLevel(i + 1),
+  }, h("span", { class: "level-check", "aria-hidden": "true" }, "✓"), h("span", { class: "level-word" }, "Level "), `${i + 1}`)));
 
   // ---- testcases: editable text, seeded from the level's examples
   const testcaseKey = () => `tc:${id}:${level}`;
