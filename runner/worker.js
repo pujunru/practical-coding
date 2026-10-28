@@ -1,6 +1,8 @@
 // Runs Python in a Web Worker so user code never blocks or touches the page.
-// Protocol: page → {id, solution, tests}; worker → {type: "ready"} once, then
-// {type: "result", id, report} or {type: "result", id, error} per run.
+// Protocol: page → {id, solution, cases (JSON), reference}; worker → {type:
+// "ready"} once, then {type: "result", id, report} or {type: "result", id,
+// error} per run. `reference` (the bank's solution) is sent only for custom
+// testcases, whose expected output it supplies.
 
 // A module worker: Pyodide 314 no longer supports classic workers.
 import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.mjs";
@@ -21,7 +23,8 @@ ready.catch((err) => self.postMessage({ type: "fatal", error: String(err) }));
 self.onmessage = async ({ data }) => {
   try {
     const runJson = await ready;
-    const report = JSON.parse(runJson(data.solution, data.tests));
+    // Pyodide turns undefined (not null) into None.
+    const report = JSON.parse(runJson(data.solution, data.cases, data.reference ?? undefined));
     self.postMessage({ type: "result", id: data.id, report });
   } catch (err) {
     self.postMessage({ type: "result", id: data.id, error: String(err) });

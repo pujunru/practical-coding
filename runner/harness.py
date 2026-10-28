@@ -1,91 +1,142 @@
 """Test harness shared by the browser runner and the problem bank's CI.
 
-Plain CPython, no dependencies. `run(solution_src, tests_src)` executes the
-user's code as module `solution`, then every `test_*` function in `tests_src`
-in definition order, and returns a JSON-serialisable report. `tests_src` may
-define `LEVELS = {1: "Single client", ...}` to name the levels that
-`test_l<N>_...` tests belong to.
+Plain CPython, no dependencies. A case is LeetCode's design-problem format:
+
+    {"ops":  ["RateLimiter", "allow", "allow"],
+     "args": [[2, 10],       ["a", 0], ["a", 5]],
+     "expected": [null, true, true]}
+
+The first op constructs the class; every later op calls a method on that
+instance. An expected value of {"raises": "ValueError"} means the call must
+raise that exception.
+
+`run(solution_src, cases, reference_src=None)` replays every case against the
+user's code and returns a JSON-serialisable report. A case without `expected`
+gets it from `reference_src`, which is how custom test cases are judged.
 """
 
 import contextlib
 import io
 import json
 import linecache
-import re
+import math
 import sys
 import time
 import traceback
-import types
 
-SOURCES = ("solution.py", "tests.py")
-LEVEL_RE = re.compile(r"^test_l(\d+)_")
+FLOAT_TOLERANCE = 1e-6
 
 
 def _load(name, src):
-    linecache.cache[f"{name}.py"] = (len(src), None, src.splitlines(True), f"{name}.py")
-    module = types.ModuleType(name)
-    module.__file__ = f"{name}.py"
-    sys.modules[name] = module
-    exec(compile(src, f"{name}.py", "exec"), module.__dict__)
-    return module
+    filename = f"{name}.py"
+    linecache.cache[filename] = (len(src), None, src.splitlines(True), filename)
+    namespace = {"__name__": name, "__file__": filename}
+    exec(compile(src, filename, "exec"), namespace)
+    return namespace
 
 
-def _trimmed_traceback(exc):
-    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename in SOURCES]
-    lines = traceback.format_list(frames)
-    lines += traceback.format_exception_only(type(exc), exc)
+def _trace(exc, filename="solution.py"):
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename == filename]
+    lines = traceback.format_list(frames) + traceback.format_exception_only(type(exc), exc)
     return "".join(lines).rstrip()
 
 
-def _failure(exc):
-    if isinstance(exc, AssertionError):
-        frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename in SOURCES]
-        where = frames[-1] if frames else None
-        message = str(exc) or (where.line if where else "assertion failed")
-        return {"kind": "assertion", "message": message}
-    return {"kind": "error", "message": _trimmed_traceback(exc)}
+def _jsonable(value):
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else repr(value)
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (set, frozenset)):
+        return sorted((_jsonable(v) for v in value), key=repr)
+    return repr(value)
 
 
-def run(solution_src, tests_src):
-    for name in ("solution", "tests"):
-        sys.modules.pop(name, None)
+def equal(got, want):
+    if isinstance(want, dict) and "raises" in want:
+        return isinstance(got, dict) and got.get("raises") == want["raises"]
+    if isinstance(want, bool) or isinstance(got, bool):
+        return type(got) is type(want) and got == want
+    if isinstance(want, (int, float)) and isinstance(got, (int, float)):
+        return abs(got - want) <= FLOAT_TOLERANCE
+    if isinstance(want, list) and isinstance(got, list):
+        return len(got) == len(want) and all(equal(g, w) for g, w in zip(got, want))
+    if isinstance(want, dict) and isinstance(got, dict):
+        return got.keys() == want.keys() and all(equal(got[k], want[k]) for k in want)
+    return got == want
 
+
+def _play(namespace, case, filename):
+    """Replay one case. Returns (outputs, trace of the first exception)."""
+    ops, args = case["ops"], case["args"]
+    cls = namespace.get(ops[0])
+    if not isinstance(cls, type):
+        message = f"class {ops[0]} is not defined"
+        return [{"raises": "NameError", "message": message}], f"NameError: {message}"
+    try:
+        instance = cls(*args[0])
+    except Exception as exc:
+        return [{"raises": type(exc).__name__, "message": str(exc)}], _trace(exc, filename)
+    outputs, trace = [None], None
+    for op, op_args in zip(ops[1:], args[1:]):
+        try:
+            outputs.append(_jsonable(getattr(instance, op)(*op_args)))
+        except Exception as exc:
+            outputs.append({"raises": type(exc).__name__, "message": str(exc)})
+            trace = trace or _trace(exc, filename)
+    return outputs, trace
+
+
+def _diff(outputs, expected):
+    if expected is None:
+        return []
+    return [i for i in range(max(len(outputs), len(expected)))
+            if i >= len(outputs) or i >= len(expected) or not equal(outputs[i], expected[i])]
+
+
+def run(solution_src, cases, reference_src=None):
     stdout = io.StringIO()
     try:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stdout):
-            _load("solution", solution_src)
-    except BaseException as exc:  # SyntaxError, NameError at import, ...
+            solution = _load("solution", solution_src)
+    except BaseException as exc:  # SyntaxError, NameError at import, SystemExit, ...
         if isinstance(exc, SyntaxError):
             message = "".join(traceback.format_exception_only(type(exc), exc)).rstrip()
         else:
-            message = _trimmed_traceback(exc)
-        return {"ok": False, "stage": "load", "error": message, "stdout": stdout.getvalue(), "tests": []}
+            message = _trace(exc)
+        return {"ok": False, "stage": "load", "error": message, "stdout": stdout.getvalue(), "cases": []}
 
-    try:
-        tests_module = _load("tests", tests_src)
-    except BaseException as exc:
-        return {"ok": False, "stage": "tests", "error": _trimmed_traceback(exc), "stdout": "", "tests": []}
+    reference = None
+    if reference_src is not None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            reference = _load("reference", reference_src)
 
     results = []
-    for name, fn in list(vars(tests_module).items()):
-        if not (name.startswith("test_") and callable(fn)):
-            continue
-        level = LEVEL_RE.match(name)
-        doc = (fn.__doc__ or "").strip().splitlines()
+    for case in cases:
+        if len(case["ops"]) != len(case["args"]) or not case["ops"]:
+            return {"ok": False, "stage": "case", "error": "Each test case needs one arguments list per operation.",
+                    "stdout": "", "cases": results}
+        expected = case.get("expected")
+        if expected is None and reference is not None:
+            with contextlib.redirect_stdout(io.StringIO()):
+                expected, _ = _play(reference, case, "reference.py")
         out = io.StringIO()
         started = time.perf_counter()
-        failure = None
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-                fn()
-        except BaseException as exc:  # includes SystemExit from user code
-            failure = _failure(exc)
+                outputs, trace = _play(solution, case, "solution.py")
+        except BaseException as exc:  # SystemExit from user code
+            outputs, trace = [{"raises": type(exc).__name__, "message": str(exc)}], _trace(exc)
+        diff = _diff(outputs, expected)
         results.append({
-            "name": name,
-            "title": doc[0] if doc else name,
-            "level": int(level.group(1)) if level else None,
-            "passed": failure is None,
-            "failure": failure,
+            "output": outputs,
+            "expected": expected,
+            "passed": expected is not None and not diff,
+            "diff": diff,
+            "trace": trace,
             "stdout": out.getvalue(),
             "ms": round((time.perf_counter() - started) * 1000, 2),
         })
@@ -95,27 +146,30 @@ def run(solution_src, tests_src):
         "stage": "done",
         "error": None,
         "stdout": stdout.getvalue(),
-        "tests": results,
-        "levels": {str(k): str(v) for k, v in getattr(tests_module, "LEVELS", {}).items()},
+        "cases": results,
     }
 
 
-def run_json(solution_src, tests_src):
-    return json.dumps(run(solution_src, tests_src))
+def run_json(solution_src, cases_json, reference_src=None):
+    return json.dumps(run(solution_src, json.loads(cases_json), reference_src))
 
 
 if __name__ == "__main__":
-    # python3 harness.py solution.py tests.py  — used by the problem bank's CI.
-    sol_path, tests_path = sys.argv[1], sys.argv[2]
-    with open(sol_path) as f:
-        sol = f.read()
-    with open(tests_path) as f:
-        tests = f.read()
-    report = run(sol, tests)
-    for r in report["tests"]:
-        print(("PASS " if r["passed"] else "FAIL ") + r["name"])
-        if r["failure"]:
-            print("  " + r["failure"]["message"].replace("\n", "\n  "))
-    if report["error"]:
-        print(report["error"])
-    sys.exit(0 if report["ok"] else 1)
+    # python3 harness.py solution.py problem.json
+    with open(sys.argv[1]) as f:
+        src = f.read()
+    with open(sys.argv[2]) as f:
+        problem = json.load(f)
+    ok = True
+    for number, level in enumerate(problem["levels"], 1):
+        report = run(src, level["cases"])
+        if report["error"]:
+            print(report["error"])
+            sys.exit(1)
+        passed = sum(c["passed"] for c in report["cases"])
+        print(f"Level {number} · {level['title']}: {passed}/{len(report['cases'])}")
+        for i, c in enumerate(report["cases"], 1):
+            if not c["passed"]:
+                print(f"  case {i}: output   {json.dumps(c['output'])}\n          expected {json.dumps(c['expected'])}")
+        ok = ok and report["ok"]
+    sys.exit(0 if ok else 1)

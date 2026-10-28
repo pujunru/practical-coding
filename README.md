@@ -5,8 +5,13 @@ LRU cache, a key-value store — in Python, right in the browser.
 
 **Live:** https://pujunru.github.io/practical-coding/
 
-- A problem list and a problem page: statement on the left, editor on the
-  right, Run (⌘/Ctrl + Enter) to see which tests pass.
+- A problem list and a LeetCode-style problem page: description on the left,
+  editor and Testcase / Test Result on the right. Every pane resizes, collapses
+  and maximizes.
+- Problems come in levels, each with its own statement and examples. **Run**
+  (⌘/Ctrl + ') tries your editable testcases; **Submit** (⌘/Ctrl + Enter) judges
+  the current level and every level before it, showing input, output and
+  expected output.
 - Python runs locally in your browser through [Pyodide](https://pyodide.org)
   (WebAssembly). Your code never leaves your machine.
 - No server, no account, no build step. Drafts and solved status are kept in
