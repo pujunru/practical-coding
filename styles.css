@@ -504,6 +504,9 @@ button.next { margin-bottom: 12px; }
 .problems td.score { width: 48px; text-align: right; }
 .problems td.diff { width: 80px; }
 .question-section .problems td.tags { width: 38%; }
+/* A flex <td> stops being a table cell; keep tag cells as cells. */
+.problems td.tags { display: table-cell; }
+.problems td.tags .tag { display: inline-block; margin: 2px 4px 2px 0; }
 .notes {
   background: var(--surface);
   border: 1px solid var(--border);
