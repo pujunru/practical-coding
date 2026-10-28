@@ -609,6 +609,32 @@ button.next { margin-bottom: 12px; }
 .self-grade { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .pager { display: flex; justify-content: space-between; gap: 12px; margin: 24px 0; font-size: 13px; }
 
+.guide-block { margin: 22px 0; }
+.guide-block > h2, .guide-block .section-head h2 { font-size: 15px; margin: 0 0 8px; }
+.guide-block.explain {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.guide-block.explain .markdown > :last-child { margin-bottom: 0; }
+.probes { display: flex; flex-direction: column; gap: 6px; }
+.probe {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+.probe > summary { cursor: pointer; font-weight: 500; display: flex; gap: 8px; list-style: none; }
+.probe > summary::-webkit-details-marker { display: none; }
+.probe > summary::before { content: "?"; flex: none; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--muted); margin-top: 2px; }
+.probe[open] > summary::before { content: "✓"; background: var(--accent); color: #fff; }
+.probe[open] > summary { margin-bottom: 6px; }
+.probe > .markdown { padding-left: 26px; }
+.probe > .markdown > :last-child { margin-bottom: 0; }
+.drill .recall-input { margin-top: 2px; }
+
 /* ---------------------------------------------------------------- question workspace */
 
 .answer-body { display: flex; flex-direction: column; padding: 10px 12px 12px; gap: 6px; }

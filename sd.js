@@ -1,4 +1,4 @@
-// System design: fundamentals drills and design-question workspaces.
+// System design: fundamentals guides and design-question workspaces.
 import {
   ID_RE, app, toolbar, fetchText, store, h, fill, renderMarkdown, difficulty,
   pane, layout, makeDivider, errorBox, showNotFound, currentRoute,
@@ -22,27 +22,6 @@ const conceptMistakes = (id) => Object.values(drillState(id)).filter((v) => v ==
 // Per question: {answers: {step: text}, ticks: [bool], revealed, best, elapsed}.
 const questionState = (id) => { try { return JSON.parse(store.get(`sdq:${id}`)) || {}; } catch { return {}; } };
 const saveQuestion = (id, patch) => store.set(`sdq:${id}`, JSON.stringify({ ...questionState(id), ...patch }));
-
-// Deterministic shuffle, so a drill looks the same every visit.
-function seeded(seed) {
-  let a = [...seed].reduce((x, c) => Math.imul(x ^ c.charCodeAt(0), 2654435761) >>> 0, 1779033703);
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function shuffled(n, seed) {
-  const order = [...Array(n).keys()];
-  const rand = seeded(seed);
-  for (let i = n - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
-  }
-  return order;
-}
 
 const md = (text, cls = "markdown") => {
   const el = h("div", { class: cls });
@@ -69,8 +48,8 @@ export async function showFundamentals() {
   }
 
   const concepts = index.categories.flatMap((c) => c.concepts);
-  const total = concepts.reduce((n, c) => n + c.drills, 0);
-  const correct = concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.drills), 0);
+  const total = concepts.reduce((n, c) => n + c.prompts, 0);
+  const correct = concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.prompts), 0);
   const mistakes = concepts.filter((c) => conceptMistakes(c.id)).length;
   const search = h("input", { type: "search", placeholder: "Search concepts", "aria-label": "Search concepts" });
   const sections = h("div", { class: "concept-sections" });
@@ -80,15 +59,15 @@ export async function showFundamentals() {
     const shownSections = index.categories.map((cat) => {
       const shown = cat.concepts.filter((c) => !q || c.title.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q));
       if (!shown.length) return null;
-      const done = cat.concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.drills), 0);
-      const all = cat.concepts.reduce((n, c) => n + c.drills, 0);
+      const done = cat.concepts.reduce((n, c) => n + Math.min(conceptScore(c.id), c.prompts), 0);
+      const all = cat.concepts.reduce((n, c) => n + c.prompts, 0);
       return h("section", { class: "concept-section" },
         h("div", { class: "section-head" }, h("h2", {}, cat.title), h("span", { class: "muted small" }, `${done} / ${all}`)),
         h("div", { class: "concept-grid" }, shown.map((c) => {
-          const score = Math.min(conceptScore(c.id), c.drills);
-          return h("a", { class: `concept-card${score === c.drills ? " done" : ""}`, href: `#/sd/f/${c.id}` },
+          const score = Math.min(conceptScore(c.id), c.prompts);
+          return h("a", { class: `concept-card${score === c.prompts ? " done" : ""}`, href: `#/sd/f/${c.id}` },
             h("span", { class: "concept-title" }, c.title),
-            h("span", { class: "concept-meta" }, bar(score, c.drills), h("span", { class: "muted small" }, `${score}/${c.drills}`)));
+            h("span", { class: "concept-meta" }, bar(score, c.prompts), h("span", { class: "muted small" }, `${score}/${c.prompts}`)));
         })),
       );
     }).filter(Boolean);
@@ -100,11 +79,11 @@ export async function showFundamentals() {
   fill(app,
     h("div", { class: "list-head" },
       h("h1", {}, "Fundamentals"),
-      h("span", { class: "muted" }, `${correct} / ${total} drills correct`),
+      h("span", { class: "muted" }, `${correct} / ${total} prompts explained`),
       h("span", { class: "spacer" }),
-      mistakes ? h("a", { class: "pill-link", href: "#/sd/review" }, `Review mistakes (${mistakes})`) : null,
+      mistakes ? h("a", { class: "pill-link", href: "#/sd/review" }, `Go again (${mistakes})`) : null,
     ),
-    h("p", { class: "muted lede" }, "Every concept has a short mental model and drills: multiple choice, ordering, back-of-the-envelope numbers and recall."),
+    h("p", { class: "muted lede" }, "Each concept is a short guide: how to explain it, the model to draw, the details interviewers probe, and prompts to answer out loud."),
     search,
     sections,
   );
@@ -124,17 +103,20 @@ export async function showReview() {
   const missed = index.categories.flatMap((cat) => cat.concepts.map((c) => ({ ...c, cat: cat.title }))).filter((c) => conceptMistakes(c.id));
   fill(app,
     h("p", {}, h("a", { class: "back", href: "#/sd/fundamentals" }, "← Fundamentals")),
-    h("h1", {}, "Review mistakes"),
+    h("h1", {}, "Go again"),
     missed.length
       ? h("div", { class: "concept-grid" }, missed.map((c) => h("a", { class: "concept-card", href: `#/sd/f/${c.id}` },
         h("span", { class: "concept-title" }, c.title),
-        h("span", { class: "muted small" }, `${c.cat} · ${conceptMistakes(c.id)} to redo`))))
-      : h("p", { class: "muted" }, "Nothing to review — every drill you answered was right."),
+        h("span", { class: "muted small" }, `${c.cat} · ${conceptMistakes(c.id)} to retry`))))
+      : h("p", { class: "muted" }, "Nothing to retry — every prompt you answered covered all its key points."),
   );
 }
 
 // ---------------------------------------------------------------- concept page
 
+// A concept is a guide, not a quiz: how to explain it, the model to draw,
+// the details interviewers probe, and prompts to answer out loud. Progress is
+// self-assessed: a prompt counts once every key point was covered.
 export async function showConcept(id) {
   if (!ID_RE.test(id)) return showNotFound();
   toolbar.replaceChildren();
@@ -154,131 +136,71 @@ export async function showConcept(id) {
   const cat = order[at]?.cat || "";
   const prev = order[at - 1];
   const next = order[at + 1];
+  const prompts = concept.prompts || [];
   document.title = `${concept.title} · Fundamentals`;
 
-  const notesOpen = store.get("sdf:notes") !== "closed";
-  const notes = h("details", { class: "notes", open: notesOpen, ontoggle: (e) => store.set("sdf:notes", e.target.open ? "open" : "closed") },
-    h("summary", {}, "Mental model"), md(concept.summary));
   const score = h("span", { class: "muted" });
-  const updateScore = () => { score.textContent = `${Math.min(conceptScore(id), concept.drills.length)} / ${concept.drills.length} correct`; };
+  const updateScore = () => { score.textContent = `${Math.min(conceptScore(id), prompts.length)} / ${prompts.length} explained`; };
   updateScore();
+
+  const details = (concept.details || []).map((d) => h("details", { class: "probe" }, h("summary", {}, md(d.q, "markdown inline")), md(d.a)));
+  const toggleAll = h("button", { class: "link", type: "button", onclick: () => {
+    const open = !details.every((d) => d.open);
+    details.forEach((d) => { d.open = open; });
+    toggleAll.textContent = open ? "Hide all answers" : "Show all answers";
+  } }, "Show all answers");
 
   fill(app,
     h("p", { class: "crumbs" }, h("a", { href: "#/sd/fundamentals" }, "Fundamentals"), h("span", { class: "muted" }, ` / ${cat}`)),
     h("div", { class: "list-head" }, h("h1", {}, concept.title), score, h("span", { class: "spacer" }),
       h("button", { class: "link", type: "button", onclick: () => { store.remove(`sdf:${id}`); showConcept(id); } }, "Reset")),
-    notes,
-    h("div", { class: "drills" }, concept.drills.map((d, i) => drillCard(id, d, i, concept.drills.length, updateScore))),
+    h("section", { class: "guide-block explain" }, h("h2", {}, "How to explain it"), md(concept.explain)),
+    h("section", { class: "guide-block" }, h("h2", {}, "The model"), md(concept.model)),
+    details.length ? h("section", { class: "guide-block" },
+      h("div", { class: "section-head" }, h("h2", {}, "Details interviewers probe"), h("span", { class: "spacer" }), toggleAll),
+      h("p", { class: "muted small" }, "Answer each one in your head, then open it."),
+      h("div", { class: "probes" }, details)) : null,
+    prompts.length ? h("section", { class: "guide-block" },
+      h("h2", {}, "Say it out loud"),
+      h("p", { class: "muted small" }, "Answer as you would in the interview, then reveal the key points and tick the ones you covered."),
+      h("div", { class: "drills" }, prompts.map((p, i) => promptCard(id, p, i, updateScore)))) : null,
     h("nav", { class: "pager" },
       prev ? h("a", { href: `#/sd/f/${prev.id}` }, `← ${prev.title}`) : h("span"),
       next ? h("a", { href: `#/sd/f/${next.id}` }, `${next.title} →`) : h("span")),
   );
 }
 
-const DRILL_LABEL = { choice: "Multiple choice", order: "Put in order", number: "Estimate", recall: "Recall" };
-
-function drillCard(conceptId, drill, i, total, onResult) {
+function promptCard(conceptId, prompt, i, onResult) {
   const previous = drillState(conceptId)[i];
-  const feedback = h("div", { class: "feedback", "aria-live": "polite" });
-  const record = (ok, message) => {
-    saveDrill(conceptId, i, ok ? "ok" : "bad");
-    card.classList.toggle("is-ok", ok);
-    card.classList.toggle("is-bad", !ok);
-    fill(feedback,
-      h("div", { class: `verdict ${ok ? "good" : "bad"}` }, ok ? "Correct" : "Not quite"),
-      typeof message === "string" ? h("p", { class: "small" }, message) : message,
-      drill.explain ? md(drill.explain, "markdown explain") : null);
-    onResult();
-  };
-  const body = { choice: choiceDrill, order: orderDrill, number: numberDrill, recall: recallDrill }[drill.type]?.(drill, `${conceptId}:${i}`, record, feedback);
+  const notes = h("textarea", { rows: 3, class: "recall-input", placeholder: "Optional: jot down your answer first.", "aria-label": "Your answer" });
+  const reveal = h("div", { class: "feedback" });
   const card = h("article", { class: `drill${previous ? ` is-${previous}` : ""}` },
     h("div", { class: "drill-head" },
-      h("span", { class: "drill-n" }, `${i + 1} / ${total}`),
-      h("span", { class: "drill-type" }, DRILL_LABEL[drill.type] || drill.type),
-      previous ? h("span", { class: `drill-prev ${previous}` }, previous === "ok" ? "✓ answered" : "✗ retry") : null),
-    md(drill.q, "markdown drill-q"),
-    body || h("p", { class: "muted" }, `Unknown drill type: ${drill.type}`),
-    feedback);
+      h("span", { class: "drill-n" }, `Prompt ${i + 1}`),
+      previous ? h("span", { class: `drill-prev ${previous}` }, previous === "ok" ? "✓ explained" : "↺ go again") : null),
+    md(prompt.q, "markdown drill-q"),
+    notes,
+    h("button", { type: "button", class: "run small-button", onclick: () => showPoints() }, "Reveal key points"),
+    reveal);
+  function showPoints() {
+    const boxes = prompt.points.map(() => h("input", { type: "checkbox" }));
+    const done = h("button", { type: "button", class: "submit small-button", onclick: () => {
+      const covered = boxes.filter((b) => b.checked).length;
+      const ok = covered === boxes.length;
+      saveDrill(conceptId, i, ok ? "ok" : "bad");
+      card.classList.toggle("is-ok", ok);
+      card.classList.toggle("is-bad", !ok);
+      result.textContent = ok ? "All key points covered." : `${covered} of ${boxes.length} covered — try it again later.`;
+      result.className = `small ${ok ? "good" : "bad"}`;
+      onResult();
+    } }, "Done");
+    const result = h("span", { class: "small" });
+    fill(reveal,
+      h("div", { class: "label" }, "Key points"),
+      h("ul", { class: "rubric" }, prompt.points.map((pt, k) => h("li", {}, h("label", {}, boxes[k], md(pt, "markdown inline"))))),
+      h("div", { class: "self-grade" }, done, result));
+  }
   return card;
-}
-
-function choiceDrill(drill, seed, record) {
-  const multi = drill.answer.length > 1;
-  const order = shuffled(drill.options.length, seed);
-  const picked = new Set();
-  const buttons = order.map((oi) => {
-    const b = h("button", { type: "button", class: "option", "aria-pressed": "false", onclick: () => {
-      if (!multi) { picked.clear(); buttons.forEach((x) => x.setAttribute("aria-pressed", "false")); }
-      picked.has(oi) ? picked.delete(oi) : picked.add(oi);
-      b.setAttribute("aria-pressed", String(picked.has(oi)));
-    } }, md(drill.options[oi], "markdown inline"));
-    b.dataset.index = oi;
-    return b;
-  });
-  const check = h("button", { type: "button", class: "submit small-button", onclick: () => {
-    if (!picked.size) return;
-    const right = new Set(drill.answer);
-    const ok = picked.size === right.size && [...picked].every((x) => right.has(x));
-    buttons.forEach((b) => {
-      const oi = Number(b.dataset.index);
-      b.classList.toggle("right", right.has(oi));
-      b.classList.toggle("wrong", picked.has(oi) && !right.has(oi));
-    });
-    record(ok);
-  } }, "Check");
-  return h("div", {}, multi ? h("p", { class: "muted small" }, "Select all that apply.") : null, h("div", { class: "options" }, buttons), check);
-}
-
-function orderDrill(drill, seed, record) {
-  let order = shuffled(drill.items.length, seed);
-  if (order.every((x, i) => x === i)) order = order.reverse();
-  const list = h("ol", { class: "order-list" });
-  const draw = (marks) => fill(list, order.map((item, pos) => h("li", { class: marks ? (marks[pos] ? "right" : "wrong") : "" },
-    md(drill.items[item], "markdown inline"),
-    h("span", { class: "order-buttons" },
-      h("button", { type: "button", class: "icon-button", "aria-label": "Move up", disabled: pos === 0, onclick: () => move(pos, -1) }, "↑"),
-      h("button", { type: "button", class: "icon-button", "aria-label": "Move down", disabled: pos === order.length - 1, onclick: () => move(pos, 1) }, "↓")))));
-  const move = (pos, d) => { [order[pos], order[pos + d]] = [order[pos + d], order[pos]]; draw(); };
-  draw();
-  const check = h("button", { type: "button", class: "submit small-button", onclick: () => {
-    const marks = order.map((item, pos) => item === pos);
-    draw(marks);
-    record(marks.every(Boolean), marks.every(Boolean) ? null : h("div", { class: "correct-order" },
-      h("div", { class: "label" }, "Correct order"), h("ol", {}, drill.items.map((t) => h("li", {}, md(t, "markdown inline"))))));
-  } }, "Check");
-  return h("div", {}, list, check);
-}
-
-function numberDrill(drill, seed, record) {
-  const input = h("input", { type: "text", inputmode: "decimal", class: "number-input", placeholder: "Your estimate", "aria-label": "Your answer" });
-  const parse = (text) => {
-    const m = text.replace(/[,_\s]/g, "").match(/^(-?\d*\.?\d+)(e-?\d+)?([kmbt])?$/i);
-    if (!m) return NaN;
-    const scale = { k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[(m[3] || "").toLowerCase()] || 1;
-    return Number(m[1] + (m[2] || "")) * scale;
-  };
-  const tolerance = drill.tolerance ?? 0;
-  const check = () => {
-    const value = parse(input.value);
-    if (Number.isNaN(value)) { input.focus(); return; }
-    const ok = Math.abs(value - drill.answer) <= Math.abs(drill.answer) * tolerance + 1e-9;
-    record(ok, `Answer: ${drill.answer.toLocaleString()}${drill.unit ? ` ${drill.unit}` : ""}${tolerance ? ` (within ±${Math.round(tolerance * 100)}% counts)` : ""}.`);
-  };
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
-  return h("div", { class: "number-row" }, input, drill.unit ? h("span", { class: "muted" }, drill.unit) : null,
-    h("button", { type: "button", class: "submit small-button", onclick: check }, "Check"),
-    h("span", { class: "muted small" }, "1.5k, 2M and 3e9 work too."));
-}
-
-function recallDrill(drill, seed, record, feedback) {
-  const text = h("textarea", { rows: 3, class: "recall-input", placeholder: "Answer in your own words, then reveal.", "aria-label": "Your answer" });
-  const reveal = h("button", { type: "button", class: "run small-button", onclick: () => {
-    fill(feedback, h("div", { class: "reference" }, h("div", { class: "label" }, "Reference"), md(drill.answer)),
-      h("div", { class: "self-grade" }, h("span", { class: "muted small" }, "Did you get it?"),
-        h("button", { type: "button", class: "submit small-button", onclick: () => record(true) }, "Got it"),
-        h("button", { type: "button", class: "run small-button", onclick: () => record(false) }, "Missed it")));
-  } }, "Reveal answer");
-  return h("div", {}, text, reveal);
 }
 
 // ---------------------------------------------------------------- questions list
